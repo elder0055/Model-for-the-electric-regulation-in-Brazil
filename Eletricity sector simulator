@@ -1,0 +1,1155 @@
+breed               [ Banks        Bank      ]
+breed               [ Firms        Firm      ]
+breed               [ HouseHolds   Household ]
+directed-link-breed [ Hireds       Hired     ]
+directed-link-breed [ Owners       Owner     ]
+breed               [ FirmEnergs   FirmEnerg ]
+
+Globals [
+  GDP
+  LevelPrice
+  levelPriceK
+  LevelPriceE
+  UnEmpRate
+  CountK-Prod
+  CountK-Cons
+  CountProd
+  CountCons
+  v1
+  v2
+  v3
+  v4
+  betha01
+  alpha01
+  betha02
+  alpha02
+  EnergyProduce
+]
+
+Banks-own [
+  Equity_Total
+  Equity_K-Firms
+  Equity_C-Firms
+  Equity_Rentists
+  Equity_Workers
+  Equity_Loans
+  Profit
+  ]
+
+Firms-own [
+  K-Firms?
+  Production
+  Price
+  Vacancy
+  Demand
+  N_workers
+  Kapital
+  Kapital_memory
+  Investiment
+  CapUtil
+  DepositBank
+  Production_t-1
+  Profit
+  ForeCastError
+  CurrentIntRate
+  LeverageRatio
+  FinancialGap
+  Loans
+  ]
+
+Households-own [
+  Worker?
+  HumanWealth
+  ConsumeDesire
+  DepositBank
+  Own?
+  Hired?
+  Income
+  ]
+
+FirmEnergs-own [ 
+  Demand
+  Production
+  Price
+  ForeCastError
+  ]
+
+;__________________________________________________________________________________________________________________________________________________________________________________________
+
+;--------------------------------------------------------------------------------------->>>>>>>>>>>>>>>> To Setup <<<<<<<<<<<<<<<<<<<<<<---------------------------------------------------
+;__________________________________________________________________________________________________________________________________________________________________________________________
+
+to setup
+
+  clear-all
+
+  ;setup Globals                                                               *******************
+
+  set GDP                  0
+  set LevelPrice           InitialPrice
+  set LevelPriceK          InitialPrice
+  set UnEmpRate            1
+  set CountK-Prod          0
+  set CountK-Cons          0
+  set CountProd            0
+  set CountCons            0
+  set v1 [ ] set v2 [ ] set v3 [ ] set v4 [ ]
+  set betha01 0 set alpha01 0
+
+  ;creating the Bank
+
+  create-Banks 1 [
+    setxy                 4.5 12.5
+    set shape             "house"
+    set size              1
+    set color             yellow
+    set Equity_Total      0
+    set Equity_K-Firms    0
+    set Equity_C-Firms    0
+    set Equity_Rentists   0
+    set Equity_Workers    0
+    set Equity_Loans      InitialEquityBank
+    set Profit            0
+    ]
+
+  ;generate firms and rentists                                                 *************
+
+  let i 0
+
+  while [ i < 10 ] [
+    let j 0
+
+    while [ j < 25 ] [
+
+      ifelse i > 7 [
+
+        ;create K-Firms type                                                 +++++++++++
+
+        create-Firms 1 [
+          setxy                 i j
+          set shape             "house"
+          set size              0.85
+          set color             2
+          set K-Firms?          true
+          set Production        InitialProdK-Firms
+          set CountK-Prod       CountK-Prod + Production
+          set Price             InitialPrice
+          set Vacancy           2
+          set Demand            0
+          set N_workers         0
+          set Kapital           ""
+          set Kapital_memory    ""
+          set Investiment       0
+          set CapUtil           ""
+          set DepositBank       InitialLiquidity
+          set Production_t-1    InitialProdK-Firms
+          set CurrentIntRate    RiskFreeIntRate
+          set LeverageRatio     0
+          set Loans             0
+          ]
+        ] [
+
+        ;create C-Firms type                                                 +++++++++++++
+
+        create-Firms 1 [
+          setxy                 i j
+          set shape             "house"
+          set size              0.85
+          set color             4
+          set K-Firms?          false
+          set Production        InitialProdC-Firms
+          set CountProd         CountProd + Production
+          set Price             InitialPrice
+          set Vacancy           2
+          set Demand            0
+          set N_workers         0
+          set Kapital           K_initial
+          set Kapital_memory    K_initial
+          set Investiment       0
+          set CapUtil           1
+          set DepositBank       InitialLiquidity
+          set Production_t-1    InitialProdC-Firms
+          set CurrentIntRate    RiskFreeIntRate
+          set LeverageRatio     0
+          set Loans             0
+          ]
+        ]
+
+        ;setup rentists as a owners of the firms                             +++++++++++++++++++++
+
+        create-Households 1 [
+          setxy                 i j
+          set shape             "person"
+          set size              0.65
+          set color             white
+          set Worker?           false
+          set HumanWealth       1
+          set ConsumeDesire     0
+          set DepositBank       InitialHouseholdsAssets
+          set Own?              true
+          set Hired?            ""
+          set Income            0
+          create-Owner-from one-of Firms-here [ set hidden? true ] ;this link shows who is the firm's owner
+          ]
+
+      set j j + 1
+      ]
+    set i i + 1
+    ]
+
+  ;setup Workers                                                              ******************
+
+  create-Households NumberWorkers [
+    setxy                 random 10 random 25
+    set shape             "person"
+    set size              0.45
+    set color             blue
+    set Worker?           true
+    set HumanWealth       1
+    set ConsumeDesire     0
+    set DepositBank       InitialHouseholdsAssets
+    set Own?              ""
+    set Hired?            false
+    set Income            0
+    ]
+
+  ask Banks [
+    set Equity_K-Firms   sum [DepositBank] of Firms      with [K-Firms?]
+    set Equity_C-Firms   sum [DepositBank] of Firms      with [not K-Firms?]
+    set Equity_Rentists  sum [DepositBank] of Households with [not Worker?]
+    set Equity_Workers   sum [DepositBank] of Households with [Worker?]
+    set Equity_Total     InitialEquityBank + Equity_K-Firms + Equity_C-Firms + Equity_Rentists + Equity_Workers
+    ]
+  
+  create-FirmEnergs EnergiesCompanies [ 
+    set shape       "flag"
+    set size         1.5
+    set color        white
+    setxy random     10 random 25
+    set Production   100
+    set Demand       0
+    set Price        InitialPrice
+    ]
+
+  reset-ticks
+end 
+
+;__________________________________________________________________________________________________________________________________________________________________________________________
+
+;--------------------------------------------------------------------------------------->>>>>>>>>>>>>>>> to Go  <<<<<<<<<<<<<<<<<<<<<<<<<<-------------------------------------------------
+;__________________________________________________________________________________________________________________________________________________________________________________________
+
+to go
+
+  jobMarket
+  conMarket
+  kapMarket
+  bankManagement
+  toProduce
+  growPopulation
+  EnergyMarket
+  tick
+end 
+
+
+;__________________________________________________________________________________________________________________________________________________________________________________________
+
+;--------------------------------------------------------------------------------------->>>>>>>>>>>>>>>> job market <<<<<<<<<<<<<<<<<<<<<<-------------------------------------------------
+;__________________________________________________________________________________________________________________________________________________________________________________________
+
+to jobMarket
+
+  ask Households with [Worker?] [
+
+    if Hired?   = false [
+      let i                0
+      let Vacancy?         false
+
+      while [ Hired? =     False    and     i < 5 ] [
+
+        setxy              random 10     random 25
+
+        ask one-of  Firms-here [
+          if Vacancy   >     0 [
+            set Vacancy?   true
+            set Vacancy    Vacancy - 1
+            set N_Workers  N_Workers + 1
+            ]
+          ]
+
+        if Vacancy?        = true [
+          set Hired?       true
+          set Income       Wage
+          create-Hired-to  one-of Firms-here [ set hidden? true ]  ;create a link betwen the worker and the Firm, this will end when the work is fired
+          ]
+
+        set i    i + 1
+        ];end while
+      ];end if Hired? = false
+    ];end ask Workers
+
+  set UnEmpRate (count Households with [Worker?] - count Hireds) / count Households with [Worker?]
+end 
+
+;__________________________________________________________________________________________________________________________________________________________________________________________
+
+;--------------------------------------------------------------------------------------->>>>>>>>>>>>>>>> Consume Market <<<<<<<<<<<<<<<<<<<<<<---------------------------------------------
+;__________________________________________________________________________________________________________________________________________________________________________________________
+
+to conMarket
+
+  let Revenue        0
+  let Consume        CountCons
+
+  ask Households [
+
+    set HumanWealth          HumWealthParam   *   HumanWealth     +  (1 - HumWealthParam) * Income
+    set ConsumeDesire        HumanWealth    +  DepBankParam  *   DepositBank ; this means how the agent will want to consume
+    let CsD                  ConsumeDesire
+    let Who01                ""
+    let Who02                ""
+    let Pri01                ""
+    let Pri02                ""
+    let Pro01                ""
+    let Pro02                ""
+;now they will check two diffents firms and buy at the better, if it is not enoght at the first firm the agent try to buy at the second, if not he is forced to save
+    setxy                    random 8 random 25
+    ask one-of Firms-here [
+      set Who01              Who
+      set Pri01              Price
+      set Pro01              CsD / Price
+    ]
+
+    setxy                    random 8 random 25
+    ask one-of Firms-here [
+      set Who02              Who
+      set Pri02              Price
+      set Pro02              CsD / Price
+    ]
+
+    while [ Who01 = Who02 ] [
+
+      setxy                    random 8 random 25
+      ask one-of Firms-here [
+        set Who02              Who
+        set Pri02              Price
+        set Pro02              CsD / Price
+        ]
+
+      ];end While...
+
+    ifelse Pri01 <= Pri02 [
+
+      ask Firm Who01 [
+
+        ifelse Production > CsD / Price [
+
+          set Demand         Demand        + CsD / Price
+          set CountCons      CountCons     + CsD / Price
+          set DepositBank    DepositBank   + CsD
+          set Csd            0
+          set Production     Production    - Pro01
+
+          ] [;secon part of ifelse Production > CsD / Price
+
+          ifelse Production > 0 [
+
+            set Demand         Demand        + CsD / Price
+            set CountCons      CountCons     + Production
+            set DepositBank    DepositBank   + Production * Price
+            set Csd            CsD           - Production * Price
+            set Production                   0
+
+            ] [
+
+          set Demand         Demand        + CsD / Price
+          set CountCons      CountCons     + 0
+          set DepositBank    DepositBank   + 0
+          set Csd            CsD           - 0
+          set Production                     0
+
+            ];end ifelse Production > 0
+          ];end ifelse Production > CsD / Price
+        ];end ask Firm Who01
+
+      if CsD > 0 [
+
+      ask Firm Who02 [
+
+        ifelse Production > CsD / Price [
+
+          set Demand         Demand        + CsD / Price
+          set CountCons      CountCons     + CsD / Price
+          set DepositBank    DepositBank   + CsD
+          set Production     Production    - CsD / Price
+          set Csd                            0
+
+
+          ] [;second part of ifelse Production > CsD / Price
+
+          ifelse Production > 0 [
+
+            set Demand         Demand        + CsD / Price
+            set CountCons      CountCons     + Production
+            set Consume      Consume           + Production
+            set Csd            CsD           - Production * Price
+            set Production                     0
+
+            ] [
+
+            set Demand         Demand        + CsD / Price
+            set CountCons      CountCons     + 0
+            set DepositBank    DepositBank   + 0
+            set Csd            CsD           - 0
+            set Production                     0
+
+            ];end ifelse Production > 0
+          ];end ifelse Production > CsD / Price
+        ];end ask Firm Who02
+
+        ];end If CsD > 0
+
+      ] [;second part of ifelse Pri01 <= Pri02
+
+      ask Firm Who02 [
+
+        ifelse Production > CsD / Price [
+
+          set Demand         Demand        + CsD / Price
+          set CountCons      CountCons     + CsD / Price
+          set DepositBank    DepositBank   + CsD
+          set Production     Production    - CsD / Price
+          set Csd                            0
+
+
+          ] [;secon part of ifelse Production > CsD / Price
+
+          ifelse Production > 0 [
+
+            set Demand         Demand        + CsD / Price
+            set CountCons      CountCons     + Production
+            set DepositBank    DepositBank   + Production * Price
+            set Csd            CsD           - Production * Price
+            set Production                     0
+
+            ] [
+
+          set Demand         Demand        + CsD / Price
+          set CountCons      CountCons     + 0
+          set DepositBank    DepositBank   + 0
+          set Csd            CsD           - 0
+          set Production                     0
+
+            ];end ifelse Production > 0
+          ];end ifelse Production > CsD / Price
+        ];end ask Firm Who02
+
+      if CsD > 0 [
+
+      ask Firm Who01 [
+
+        ifelse Production > CsD / Price [
+
+          set Demand         Demand        + CsD / Price
+          set CountCons      CountCons     + CsD / Price
+          set DepositBank    DepositBank   + CsD
+          set Production     Production    - CsD / Price
+          set Csd                            0
+
+          ] [;secon part of ifelse Production > CsD / Price
+
+          ifelse Production > 0 [
+
+            set Demand         Demand        + CsD / Price
+            set CountCons      CountCons     + Production
+            set DepositBank    DepositBank   + Production * Price
+            set Csd            CsD           - Production * Price
+            set Production                     0
+
+            ] [
+
+            set Demand         Demand        + CsD / Price
+            set CountCons      CountCons     + 0
+            set DepositBank    DepositBank   + 0
+            set Csd            CsD           - 0
+            set Production                     0
+
+            ];end ifelse Production > 0
+          ];end ifelse Production > CsD / Price
+        ];end ask Firm Who01
+
+        ];end If CsD > 0**********************************************************
+
+      ];end ifelse Pri01 <= Pri02
+
+      ifelse    Worker?     [set DepositBank        DepositBank + Income - (ConsumeDesire - CsD)] [ set DepositBank        DepositBank - (ConsumeDesire - CsD) ]
+      set       Revenue     Revenue   +  ConsumeDesire - CsD
+
+    ];end ask households ////////////////////////////////////////////////////////////////////////\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
+  set Consume         CountCons  -  Consume
+  set LevelPrice      Revenue    /  Consume
+end 
+
+;__________________________________________________________________________________________________________________________________________________________________________________________
+
+;--------------------------------------------------------------------------------------->>>>>>>>>>>>>>>> To Produce <<<<<<<<<<<<<<<<<<<<<<-------------------------------------------------
+;__________________________________________________________________________________________________________________________________________________________________________________________
+
+to toProduce
+
+  set GDP                    0
+
+  ask Firms with [ not K-Firms? ] [
+
+    ;energy situation
+    let EnergyNeed N_Workers
+    ask one-of FirmEnergs [ set Demand Demand + EnergyNeed ]
+    ;end energy
+    set Vacancy               0
+    set Profit                max list         0 ((Production_t-1 - Production) * Price - N_Workers * Wage)
+    set Production            min list         (N_Workers  * N_Prod) (Kapital * K_Prod)
+    set GDP                   GDP              + Production
+    set CountProd             CountProd        + Production
+    set DepositBank           DepositBank      - (N_Workers * Wage) - (Profit * DividendPayoutRatio)
+
+    ;...........now, how much will need to produce next period..........
+
+    let DesireProduction      ""
+    set ForeCastError         Demand           - Production_t-1
+
+    ifelse  (ForeCastError >= 0  and Price >= LevelPrice) [
+
+      set DesireProduction    Production_t-1   + QtdAdjParam * ForeCastError
+
+    ] [
+
+    ifelse (ForeCastError < 0 and Price < LevelPrice) [
+
+      set DesireProduction    Production_t-1   + QtdAdjParam * ForeCastError
+
+      ]
+
+    [ set DesireProduction    Production_t-1 ]
+
+      ];end desireproduction seting
+
+    let MaxUtilKap            (Kapital         * K_prod) / N_Prod
+    let Need_Workers          max list 0 (  min list (1 + int (DesireProduction / N_Prod))   (1 + int MaxUtilKap)  )
+
+    ifelse Need_Workers <= N_Workers [ ; then the firm to fired some employee
+
+      while [ (Need_Workers < N_Workers)  or N_Workers = 0] [
+
+        ask one-of my-in-Hireds [
+          ask other-end [
+            set Hired?     false
+            set Income     0
+            ]
+          die
+          ]
+
+        set N_Workers       N_Workers - 1
+        ];end while...
+
+      ] [;end first part of Need_workers <= N_Workers
+
+      set Vacancy           Need_workers - N_Workers ;here the firm to hired, will open a vacancy and try to fill next period
+
+      ];end ifelse Need_Workers...
+
+    if ForeCastError   <=   0   and   Price >  LevelPrice  [ set Price    Price * (1 - random-float 1 * 0.10)]
+    if ForeCastError   >    0   and   Price <= LevelPrice  [ set Price    Price * (1 + random-float 1 * 0.10)]
+
+    set Demand               0
+    set CapUtil              Production / (Kapital * K_Prod)
+    set Production_t-1       Production
+
+
+    ;Kapital depreciation end the Kapital Memory
+
+    if ticks > 1            [ set Kapital_memory    (MemInv * Kapital_memory) + (1 - MemInv ) * Kapital ]
+    set Kapital             Kapital * (1 - Depr * CapUtil)
+
+  ];end ask C-Firms
+
+
+; now produce at K-Firms........................................................................................................................................................
+
+  ask Firms with [ K-Firms? ] [
+
+    set Vacancy               0
+    set Profit                max list           0 (Production_t-1 * Price)
+    set GDP                   GDP                + N_Workers * N_Prod
+    set CountK-Prod           CountK-Prod        + N_Workers * N_Prod
+    set DepositBank           DepositBank        - (N_Workers * Wage) - (Profit * DividendPayoutRatio)
+
+    let DesireProduction      ""
+    set ForeCastError         Demand           - Production_t-1
+
+    ifelse  (ForeCastError >= 0  and Price >= LevelPriceK) [
+
+      set DesireProduction    max list 0 (Production_t-1   + QtdAdjParam * ForeCastError - Production)
+
+    ] [
+
+    ifelse (ForeCastError < 0 and Price < LevelPriceK) [
+
+      set DesireProduction    max list 0 (Production_t-1   + QtdAdjParam * ForeCastError - Production)
+
+      ]
+
+    [ set DesireProduction    max list 0 (Production_t-1 - Production)]
+
+      ];end desireproduction seting
+
+    set Production            N_Workers  * N_Prod + (1 - Depr * 16) * Production
+    set Production_t-1        N_Workers  * N_Prod
+    let Need_Workers          1 + int (DesireProduction / N_Prod)
+    if DesireProduction <= 0  [set Need_Workers 0]
+
+    ifelse Need_Workers <= N_Workers [
+
+      while [ Need_Workers < N_Workers ] [
+
+        ask one-of my-in-Hireds [
+          ask other-end [
+            set Hired?     false
+            set Income     0
+            ]
+          die
+          ]
+
+        set N_Workers       N_Workers - 1
+        ];end while...
+
+      ] [;end first part of Need_workers <= N_Workers
+
+      set Vacancy           Need_workers - N_Workers
+
+      ];end ifelse Need_Workers...
+
+    if ForeCastError   <=     0   and   Price >    LevelPriceK  [ set Price    Price * (1 - random-float 1 * 0.10)]
+    if ForeCastError   >      0   and   Price <=   LevelPricek  [ set Price    Price * (1 + random-float 1 * 0.10)]
+
+    set Demand               0
+
+    ];end ask K-Firms ............................................................................................
+
+
+  ask Households with [ not Worker? ] [
+    let Dividend            0
+    ask one-of my-in-Owners [
+      ask other-end [
+        if Profit             > 0 [ set Dividend Profit * 0.20 ]
+      ]
+      ]
+    set DepositBank           DepositBank + Dividend
+    set Income                Dividend
+    ]
+end 
+
+
+;__________________________________________________________________________________________________________________________________________________________________________________________
+
+;--------------------------------------------------------------------------------------->>>>>>>>>>>>>>>> To kapMarket <<<<<<<<<<<<<<<<<<<<<<-----------------------------------------------
+;__________________________________________________________________________________________________________________________________________________________________________________________
+
+to kapMarket
+
+  set CountK-Cons           0
+  let Revenue               0
+
+  ask Firms with [ not K-Firms?] [
+
+    if random-float 1 < ProbInv [
+
+    ;here lets think CsD as an Investiment Desire
+
+    let CsD max list        0     ((((1 / DesCapUt) + (Depr / ProbInv)) * Kapital_memory) - (1 - CapUtil * Depr) * Kapital)
+    let Debts               0
+    let Who01               ""
+    let Pri01               ""
+    let Who02               ""
+    let Pri02               ""
+    let X                   xcor
+    let Y                   ycor
+
+;searching for the better price, the Consumer Firm will try to buy the Capital she needs at the better price
+
+    setxy (random 2 + 8) random 25
+    ask one-of other Firms-Here [
+      set Who01             who
+      set Pri01             Price
+      ]
+
+    setxy (random 2 + 8) random 25
+    ask one-of other Firms-Here [
+      set Who02             who
+      set Pri02             Price
+      ]
+
+    while [Who01 = Who02] [
+
+      setxy (random 2 + 8) random 25
+      ask one-of other Firms-Here [
+        set Who02             who
+        set Pri02             Price
+      ]
+
+      ];end while who01 = who02
+
+    let Pro01 max list        0 (DepositBank  / Pri01)
+    let Pro02 max list        0 (DepositBank  / Pri02)
+    set CsD   min (list       CsD Pro01 Pro02)
+    set Investiment           CsD
+
+    ifelse Pri01 <= Pri02 [
+
+      ask Firm Who01 [
+
+        ifelse Production >= CsD [
+
+          set Demand          CsD * 1
+          set CountK-Cons     CountK-Cons  + CsD
+          set Revenue         Revenue      + CsD  * Price
+          set DepositBank     DepositBank  + CsD  * Price
+          set Debts           Debts        + CsD  * Price
+          set Production      Production   - CsD
+          set CsD             0
+
+          ] [
+
+          ifelse Production > 0 [
+
+            set Demand          CsD * 1
+            set CountK-Cons     CountK-Cons  + Production
+            set Revenue         Revenue      + Production  * Price
+            set DepositBank     DepositBank  + Production  * Price
+            set Debts           Debts        + Production  * Price
+            set CsD             CsD          - Production
+            set Production      0
+
+            ] [
+
+          set Demand          CsD * 1
+          set CountK-Cons     CountK-Cons  + 0
+          set Revenue         Revenue      + 0
+          set DepositBank     DepositBank  + 0
+          set Debts           Debts        + 0
+          set Production      0
+          set CsD             CsD
+
+            ];end ifelse production > 0
+
+          ];end ifelse Production >= CsD
+
+        ];end ask Firm Who01
+
+      if CsD > 0 [
+
+        ask Firm Who02 [
+
+          ifelse Production >= CsD [
+
+            set Demand          CsD * 1
+            set CountK-Cons     CountK-Cons  + CsD
+            set Revenue         Revenue      + CsD  * Price
+            set DepositBank     DepositBank  + CsD  * Price
+            set Debts           Debts        + CsD  * Price
+            set Production      Production   - CsD
+            set CsD             0
+
+          ] [
+
+          ifelse Production > 0 [
+
+            set Demand          CsD * 1
+            set CountK-Cons     CountK-Cons  + Production
+            set Revenue         Revenue      + Production  * Price
+            set DepositBank     DepositBank  + Production  * Price
+            set Debts           Debts        + Production  * Price
+            set CsD             CsD          - Production
+            set Production      0
+
+          ] [
+
+          set Demand          CsD * 1
+          set CountK-Cons     CountK-Cons  + 0
+          set Revenue         Revenue      + 0
+          set DepositBank     DepositBank  + 0
+          set Debts           Debts        + 0
+          set Production      0
+          set CsD             CsD
+
+          ];end ifelse production > 0
+          ];end ifelse Production >= CsD
+        ];end ask Firm Who02
+        ];end if CsD > 0
+
+      ] [
+
+      ask Firm Who02 [
+
+        ifelse Production >= CsD [
+
+          set Demand          CsD * 1
+          ;set GDP             GDP          + CsD
+          set CountK-Cons     CountK-Cons  + CsD
+          set Revenue         Revenue      + CsD  * Price
+          set DepositBank     DepositBank  + CsD  * Price
+          set Debts           Debts        + CsD  * Price
+          set Production      Production   - CsD
+          set CsD             0
+
+          ] [
+
+          ifelse Production > 0 [
+
+            set Demand          CsD * 1
+            set CountK-Cons     CountK-Cons  + Production
+            set Revenue         Revenue      + Production  * Price
+            set DepositBank     DepositBank  + Production  * Price
+            set Debts           Debts        + Production  * Price
+            set CsD             CsD          - Production
+            set Production      0
+
+            ] [
+
+          set Demand          CsD * 1
+          set CountK-Cons     CountK-Cons  + 0
+          set Revenue         Revenue      + 0
+          set DepositBank     DepositBank  + 0
+          set Debts           Debts        + 0
+          set Production      0
+          set CsD             CsD
+
+            ];end ifelse production > 0
+          ];end ifelse Production >= CsD
+        ];end ask Firm Who02
+
+      if CsD > 0 [
+
+        ask Firm Who01 [
+
+          ifelse Production >= CsD [
+
+            set Demand          CsD * 1
+            set CountK-Cons     CountK-Cons  + CsD
+            set Revenue         Revenue      + CsD  * Price
+            set DepositBank     DepositBank  + CsD  * Price
+            set Debts           Debts        + CsD  * Price
+            set Production      Production   - CsD
+            set CsD             0
+
+          ] [
+
+          ifelse Production > 0 [
+
+            set Demand          CsD * 1
+            set CountK-Cons     CountK-Cons  + Production
+            set Revenue         Revenue      + Production  * Price
+            set DepositBank     DepositBank  + Production  * Price
+            set Debts           Debts        + Production  * Price
+            set CsD             CsD          - Production
+            set Production      0
+
+          ] [
+
+          set Demand          CsD * 1
+          set CountK-Cons     CountK-Cons  + 0
+          set Revenue         Revenue      + 0
+          set DepositBank     DepositBank  + 0
+          set Debts           Debts        + 0
+          set Production      0
+          set CsD             CsD
+
+          ];end ifelse production > 0
+          ];end ifelse Production >= CsD
+        ];end ask Firm Who01
+        ];end if CsD > 0
+      ];end ifelse Pri01 <= Pri02
+
+
+    setxy X Y
+    set Investiment           Investiment  - CsD
+    set DepositBank           DepositBank  - Debts
+    set Kapital               Kapital      + Investiment
+
+    ];end ask C-Firms
+
+  ];end if random < ProbInvs
+
+  if Countk-Cons > 0 [ set LevelPriceK           Revenue      /   CountK-Cons ]
+end  ; to kapitalmarket
+
+;__________________________________________________________________________________________________________________________________________________________________________________________
+
+;--------------------------------------------------------------------------------------->>>>>>>>>>>>>>>> To BankManagement <<<<<<<<<<<<<<<<<<<<<<------------------------------------------
+;__________________________________________________________________________________________________________________________________________________________________________________________
+
+to bankManagement
+
+  ask Firms with [not K-Firms?] [
+
+    ifelse ticks < Tc [
+      set v1 lput (DepositBank * LeverageRatio) v1
+      ifelse DepositBank > 0 [ set v2 lput 1 v2 ] [ set v2 lput 0 v2 ]
+    ] [
+    set v1 lput LeverageRatio v1 set v1 remove-item 0 v1
+    ifelse DepositBank > 0 [ set v2 lput 1 v2 ] [ set v2 lput 0 v2 ] set v2 remove-item 0 v2
+    ]
+    ];end ask C-firms
+
+  ask Firms with [K-Firms?] [
+
+    ifelse ticks < (Tc * 4) [
+      set v3 lput (DepositBank * LeverageRatio) v3
+      ifelse DepositBank > 0 [ set v4 lput 1 v4 ] [ set v4 lput 0 v4 ]
+    ] [
+    set v3 lput LeverageRatio v3 set v3 remove-item 0 v3
+    ifelse DepositBank > 0 [ set v4 lput 1 v4 ] [ set v4 lput 0 v4 ] set v4 remove-item 0 v4
+    ]
+    ];end ask K-firms
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+    ask Banks [
+
+      let Loans?    Equity_Loans
+      let Profit?   Profit
+
+      ask Firms [
+
+        set DepositBank      DepositBank - Loans * CurrentIntRate - Loans * InstallmentDebt
+        set Loans            Loans       - Loans * InstallmentDebt
+        set Profit?          Profit?     + Loans * CurrentIntRate
+        set Loans?           Loans?      + Loans * InstallmentDebt
+        set FinancialGap     max list 0  ((Vacancy + N_workers) * Wage + Investiment * LevelPriceK - DepositBank)
+        set LeverageRatio    (FinancialGap    + Loans)          / (abs DepositBank + FinancialGap + Loans)
+        let AvalibleFunding  min list (max list 0 (Loans?  * BankLossParam)) FinancialGap
+
+          if AvalibleFunding > 0 [
+            let Numerator        1 + (RiskFreeIntRate / InstallmentDebt)
+            let Denominator      (1 - (1 - InstallmentDebt) ^ (1 + LeverageRatio * 0.10)) / InstallmentDebt
+            set CurrentIntRate   (BankMarkup      * ((Numerator / Denominator) - InstallmentDebt)) / 100
+            set Loans?           Loans?          - AvalibleFunding
+            set DepositBank      DepositBank     + AvalibleFunding
+            set Loans            Loans           + AvalibleFunding
+          ];end if avaliblefunding
+
+        ;bankrupicies
+
+        if DepositBank <= 0 [
+
+          ifelse K-Firms? [
+
+            set Loans?          Loans?       +  Loans
+            set Profit?         Profit?      -  Loans
+            let Debts?          DepositBank
+
+            ask one-of my-out-Owners [ ask other-end [ set DepositBank  DepositBank + Debts? - InitialLiquidity ] ] ;capitalist recaptilyze the firm
+
+            while [ N_Workers > 0 ] [
+
+              ask one-of my-in-Hireds [
+                ask other-end [
+                  set Hired?         false
+                  set Income         0
+                ]
+                die
+              ]
+
+              set N_workers N_workers - 1
+            ];end while...
+
+            set Production        InitialProdK-Firms
+            set CountK-Prod       CountK-Prod + Production
+            set Price             LevelPrice
+            set Vacancy           2
+            set Demand            0
+            set N_workers         0
+            set K-Firms?          true
+            set Kapital           ""
+            set Kapital_memory    ""
+            set Investiment       0
+            set CapUtil           ""
+            set DepositBank       InitialLiquidity
+            set Production_t-1    InitialProdK-Firms
+            set Loans             0
+            set FinancialGap      0
+            set LeverageRatio     0
+            set CurrentIntRate    RiskFreeIntRate
+
+            ] [;C-Firms...
+
+            set Loans?          Loans?     + Loans
+            set Profit?         Profit?    - Loans
+            let Debts?          DepositBank
+
+            ask one-of my-out-Owners [ ask other-end [ set DepositBank  DepositBank + Debts? - InitialLiquidity ] ] ;capitalist recaptilyze the firm
+
+            while [ N_Workers > 0 ] [
+
+              ask one-of my-in-Hireds [
+                ask other-end [
+                  set Hired?         false
+                  set Income         0
+                ]
+                die
+              ]
+
+              set N_workers N_workers - 1
+            ];end while...
+
+            set Production        InitialProdC-Firms
+            set CountProd         CountProd + Production
+            set Price             LevelPrice
+            set Vacancy           2
+            set Demand            0
+            set N_workers         0
+            set K-Firms?          false
+            set Kapital           K_initial
+            set Kapital_memory    K_initial
+            set Investiment       0
+            set CapUtil           1
+            set DepositBank       InitialLiquidity
+            set Production_t-1    InitialProdC-Firms
+            set Loans             0
+            set FinancialGap      0
+            set LeverageRatio     0
+            set CurrentIntRate    RiskFreeIntRate
+
+            ];end ifelse K-Firms?
+          ];end if depositbank < 0
+
+        ];end ask firms
+
+      let Dividend?        max list 0 ((Profit? - Profit) * DividendPayoutRatio)
+      ask Households with [Worker? = false] [ set DepositBank       DepositBank + (Dividend? / 250) ];the capitalist receive the profit from the bank
+
+      set Profit           Profit?           - Dividend?
+      set Equity_Loans     Loans?
+      set Equity_K-Firms   sum [DepositBank] of Firms      with [K-Firms?]
+      set Equity_C-Firms   sum [DepositBank] of Firms      with [not K-Firms?]
+      set Equity_Rentists  sum [DepositBank] of Households with [not Worker?]
+      set Equity_Workers   sum [DepositBank] of Households with [Worker?]
+      set Equity_Total     Equity_Loans + Equity_K-Firms + Equity_C-Firms + Equity_Rentists + Equity_Workers + Profit
+
+    ];end ask banks
+
+    set betha01 betha v1 v2
+    set alpha01 alpha (mean v1) (mean v2) betha01
+    set betha02 betha v3 v4
+    set alpha02 alpha (mean v3) (mean v4) betha02
+end 
+
+;__________________________________________________________________________________________________________________________________________________________________________________________
+
+;--------------------------------------------------------------------------------------------Optional, population growth ------------------------------------------------------------------
+;__________________________________________________________________________________________________________________________________________________________________________________________
+
+to growPopulation
+  if NewWorkers? = true [
+    create-Households %Grow / 100 * count (Households with [Worker? = true]) [
+    setxy                 random 10 random 25
+    set shape             "person"
+    set size              0.65
+    set color             blue
+    set Worker?           true
+    set HumanWealth       0
+    set ConsumeDesire     0
+    set DepositBank       InitialHouseholdsAssets
+    ask Banks             [ set Equity_Workers    Equity_Workers + InitialHouseholdsAssets ]
+    set Hired?            false
+    set Income            0
+    ]
+
+  ask Banks [
+    set Equity_Total     InitialEquityBank + Equity_K-Firms + Equity_C-Firms + Equity_Rentists + Equity_Workers
+    ]
+  ]
+end 
+
+
+;__________________________________________________________________________________________________________________________________________________________________________________________
+
+;--------------------------------------------------------------------------------------------Energy Market -------------------------------------------------------------------------
+;__________________________________________________________________________________________________________________________________________________________________________________________
+
+to EnergyMarket
+  
+  if Regulation = "FreeEnergy" [
+    ask FirmEnergs [ 
+      set ForecastError Production - Demand
+      ifelse ForecastError > 0 and Price < LevelPriceE [ 
+        set Production Production - (Production * (1 - QtdAdjParam))
+      ] [ 
+      if ForecastError < 0 and Price > LevelPriceE [ set Production Production + Production * (1 - QtdAdjParam) ]
+      ];end ifelse forecasterror
+      
+      if ForecastError > 0 and Price >= LevelPriceE [ set Price Price * (1 - (random-float 1 * 0.1)) * (1 + ((random-float 1 * NaturalResources) - (NaturalResources / 2)))]
+      if ForecastError < 0 and Price <= LevelPriceE [ set Price Price * (1 + (random-float 1 * 0.1)) * (1 + ((random-float 1 * NaturalResources) - (NaturalResources / 2)))]      
+      
+      set Demand 0
+      
+    ];end ask energyFirms
+  ]
+  
+    if Regulation = "IndexPrice" [
+    ask FirmEnergs [ 
+      set ForecastError Production - Demand
+      ifelse ForecastError > 0 and Price < LevelPriceE [ 
+        set Production Production - (Production * (1 - QtdAdjParam))
+      ] [ 
+      if ForecastError < 0 and Price > LevelPriceE [ set Production Production + Production * (1 - QtdAdjParam) ]
+      ];end ifelse forecasterror
+      
+      ;if ForecastError > 0 and Price >= LevelPrice [ set Price Price * (1 - (random-float 1 * 0.1))]
+      if ForecastError < 0 and Price <= LevelPrice [ set Price Price * (1 + (random-float 1 * 0.1)) * (1 + ((random-float 1 * NaturalResources) - (NaturalResources / 2)))]      
+      
+      set Demand 0
+      
+    ];end ask energyFirms
+  ]
+  
+    if Regulation = "CostPrice" [
+    ask FirmEnergs [ 
+      set ForecastError Production - Demand
+      ifelse ForecastError > 0 and Price < LevelPriceE [ 
+        set Production Production - (Production * (1 - QtdAdjParam))
+      ] [ 
+      if ForecastError < 0 and Price > LevelPriceE [ set Production Production + Production * (1 - QtdAdjParam) ]
+      ];end ifelse forecasterror
+      
+      set Price max list Price (Price * (1 + ((random-float 1 * NaturalResources) - (NaturalResources / 2))))
+      
+      set Demand 0
+      
+    ];end ask energyFirms
+  ]  
+  
+  
+  set LevelPriceE   mean [Price]     of FirmEnergs
+  set EnergyProduce sum [Production] of FirmEnergs
+end 
+
+
+
+
+;initial tests to include the logistic equation to model de interests rates pratice for the bank management
+
+to-report betha [ X Y ]
+
+  let meanX     mean   X
+  let meanY     mean   Y
+  let firstpart (map [((?1 - meanX) * (?2 - meanY))] X Y)
+  let secndpart (map [((?  - meanX) * (?  - meanX))] X)
+  ifelse  sum secndpart != 0 [ report        (sum firstpart) / (sum secndpart) ] [ report 0 ]
+end 
+
+to-report alpha [ X Y B ]
+
+  report Y - B * X
+end 
